@@ -1,0 +1,252 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific - Data files
+data/raw/*.csv
+data/processed/*.csv
+data/external/*.csv
+data/raw/*.xlsx
+data/processed/*.xlsx
+data/external/*.xlsx
+data/raw/*.json
+data/processed/*.json
+data/external/*.json
+
+# Keep sample data and README files
+!data/raw/sample_data.csv
+!data/raw/food_security_long_format.csv
+!data/*/README.md
+!data/*/.gitkeep
+
+# Project specific - Output files
+outputs/models/*.pkl
+outputs/models/*.joblib
+outputs/models/*.json
+outputs/reports/*.csv
+outputs/reports/*.xlsx
+outputs/reports/*.pdf
+outputs/reports/*.html
+outputs/figures/*.png
+outputs/figures/*.jpg
+outputs/figures/*.jpeg
+outputs/figures/*.svg
+outputs/figures/*.pdf
+outputs/predictions/*.csv
+outputs/predictions/*.json
+
+# Keep .gitkeep files to maintain directory structure
+!outputs/*/.gitkeep
+!data/*/.gitkeep
+
+# Log files
+logs/*.log
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Machine Learning specific
+*.h5
+*.hdf5
+*.pkl
+*.joblib
+*.model
+*.weights
+
+# Data science notebooks output
+*.html
+
+# Configuration files with sensitive data
+config/secrets.yaml
+config/api_keys.yaml
+config/database.yaml
+
+# Keep template config files
+!config/template_*.yaml
+!config/model_config.yaml
+!config/*.example
+
+# Backup files
+*.bak
+*.backup
+
+# Large files (typical ML artifacts)
+*.tar.gz
+*.zip
+*.rar
+
+# pytest
+.pytest_cache/
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual environment (additional patterns)
+pip-selfcheck.json
+pyvenv.cfg
+
+# Node.js (if using any JS tools)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# R (if using R scripts)
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+
+# MATLAB
+*.asv
+*.mlapp
+
+# Temporary system files
+*.DS_Store
+desktop.ini
+
+# Project specific temp directories
+temp_analysis/
+scratch/
+sandbox/
+
+# Docker
+Dockerfile.local
+docker-compose.override.yml
+.dockerignore.local
