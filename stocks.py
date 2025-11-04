@@ -71,9 +71,9 @@ st.markdown("""
 <style>
     .big-metric {font-size: 24px; font-weight: bold;}
     .insight-box {padding: 15px; border-radius: 5px; margin: 10px 0;}
-    .bullish {background-color: #d4edda; border-left: 5px solid #28a745;}
-    .bearish {background-color: #f8d7da; border-left: 5px solid #dc3545;}
-    .neutral {background-color: #fff3cd; border-left: 5px solid #ffc107;}
+    .bullish {background-color: #d4edda; border-left: 5px solid #28a745; color: #000000;} /* Menambahkan teks hitam */
+    .bearish {background-color: #f8d7da; border-left: 5px solid #dc3545; color: #000000;} /* Menambahkan teks hitam */
+    .neutral {background-color: #fff3cd; border-left: 5px solid #ffc107; color: #000000;} /* Menambahkan teks hitam */
 </style>
 """, unsafe_allow_html=True)
 
