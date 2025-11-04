@@ -8,6 +8,61 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
+# ... (setelah semua import)
+
+# --- FUNGSI CACHE UNTUK YFINANCE ---
+# Kita cache data untuk 10 menit (600 detik) atau 1 jam (3600 detik)
+# Ini akan mengurangi panggilan API secara drastis
+
+@st.cache_data(ttl=600) # Cache data histori selama 10 menit
+def get_stock_history(ticker, period):
+    stock = yf.Ticker(ticker)
+    df = stock.history(period=period)
+    if df.empty:
+        return None
+    return df
+
+@st.cache_data(ttl=3600) # Cache info perusahaan selama 1 jam
+def get_stock_info(ticker):
+    try:
+        return yf.Ticker(ticker).info
+    except Exception as e:
+        return None # Kembalikan None jika info gagal diambil
+
+@st.cache_data(ttl=3600) # Cache data keuangan selama 1 jam
+def get_financial_data(ticker):
+    stock = yf.Ticker(ticker)
+    try:
+        financials = {
+            'income': stock.financials,
+            'balance': stock.balance_sheet,
+            'cashflow': stock.cashflow
+        }
+        return financials
+    except Exception as e:
+        return None
+
+@st.cache_data(ttl=3600) # Cache data holders selama 1 jam
+def get_holders_data(ticker):
+    stock = yf.Ticker(ticker)
+    try:
+        holders = {
+            'major': stock.major_holders,
+            'institutional': stock.institutional_holders
+        }
+        return holders
+    except Exception as e:
+        return None
+
+@st.cache_data(ttl=3600) # Cache data rekomendasi selama 1 jam
+def get_recommendations_data(ticker):
+    try:
+        return yf.Ticker(ticker).recommendations
+    except Exception as e:
+        return None
+
+# --- AKHIR FUNGSI CACHE ---
+
 # Konfigurasi halaman
 st.set_page_config(page_title="Analisis Saham IHSG Pro", page_icon="📈", layout="wide")
 
@@ -282,13 +337,17 @@ def simple_prediction(df, info):
     }
 
 # Fungsi untuk menampilkan financial statements
-def display_financials(stock):
+def display_financials(financials_data):
+    if financials_data is None:
+        st.info("Data financial statements tidak tersedia untuk saham ini")
+        return
+        
     try:
         tabs = st.tabs(["💰 Income Statement", "📊 Balance Sheet", "💵 Cash Flow"])
         
         with tabs[0]:
             st.subheader("Laporan Laba Rugi")
-            income_stmt = stock.financials
+            income_stmt = financials_data['income']
             if not income_stmt.empty:
                 st.dataframe(income_stmt, use_container_width=True)
             else:
@@ -296,7 +355,7 @@ def display_financials(stock):
         
         with tabs[1]:
             st.subheader("Neraca")
-            balance_sheet = stock.balance_sheet
+            balance_sheet = financials_data['balance']
             if not balance_sheet.empty:
                 st.dataframe(balance_sheet, use_container_width=True)
             else:
@@ -304,7 +363,7 @@ def display_financials(stock):
         
         with tabs[2]:
             st.subheader("Arus Kas")
-            cash_flow = stock.cashflow
+            cash_flow = financials_data['cashflow']
             if not cash_flow.empty:
                 st.dataframe(cash_flow, use_container_width=True)
             else:
@@ -319,16 +378,19 @@ if analyze_button or 'last_stock' in st.session_state:
     
     try:
         with st.spinner(f"Menganalisis {stock_code}..."):
-            stock = yf.Ticker(stock_code)
-            df = stock.history(period=period)
-            info = stock.info
             
-            if df.empty:
-                st.error("❌ Data saham tidak ditemukan. Pastikan kode benar (contoh: BBCA.JK)")
+            # --- MODIFIKASI: PANGGIL FUNGSI CACHE ---
+            df = get_stock_history(stock_code, period)
+            info = get_stock_info(stock_code)
+            # --- AKHIR MODIFIKASI ---
+            
+            if df is None or info is None:
+                st.error(f"❌ Data saham {stock_code} tidak ditemukan atau gagal diambil. Pastikan kode benar (contoh: BBCA.JK)")
+            
             else:
                 df = calculate_all_indicators(df)
                 
-                # Header Info
+                # Header Info (info sudah ada)
                 st.markdown(f"## 🏢 {info.get('longName', stock_code)}")
                 
                 col1, col2, col3, col4, col5 = st.columns(5)
@@ -542,7 +604,8 @@ if analyze_button or 'last_stock' in st.session_state:
                 
                 # TAB 4: FINANCIALS
                 with main_tabs[3]:
-                    display_financials(stock)
+                    financials_data = get_financial_data(stock_code)
+                    display_financials(financials_data) # Panggil fungsi yang sudah dimodifikasi
                 
                 # TAB 5: KEY STATISTICS
                 with main_tabs[4]:
@@ -585,34 +648,24 @@ if analyze_button or 'last_stock' in st.session_state:
                     
                     with col1:
                         st.markdown("### 🏢 Major Holders")
-                        try:
-                            major_holders = stock.major_holders
-                            if not major_holders.empty:
-                                st.dataframe(major_holders, use_container_width=True)
-                            else:
-                                st.info("Data major holders tidak tersedia")
-                        except:
+                        holders_data = get_holders_data(stock_code)
+                        if holders_data and not holders_data['major'].empty:
+                            st.dataframe(holders_data['major'], use_container_width=True)
+                        else:
                             st.info("Data major holders tidak tersedia")
                         
                         st.markdown("### 🏦 Institutional Holders")
-                        try:
-                            inst_holders = stock.institutional_holders
-                            if not inst_holders.empty:
-                                st.dataframe(inst_holders.head(10), use_container_width=True)
-                            else:
-                                st.info("Data institutional holders tidak tersedia")
-                        except:
+                        if holders_data and not holders_data['institutional'].empty:
+                            st.dataframe(holders_data['institutional'].head(10), use_container_width=True)
+                        else:
                             st.info("Data institutional holders tidak tersedia")
                     
                     with col2:
                         st.markdown("### 📊 Analyst Recommendations")
-                        try:
-                            recommendations = stock.recommendations
-                            if not recommendations.empty:
-                                st.dataframe(recommendations.tail(10), use_container_width=True)
-                            else:
-                                st.info("Data rekomendasi analis tidak tersedia")
-                        except:
+                        recommendations = get_recommendations_data(stock_code)
+                        if recommendations is not None and not recommendations.empty:
+                            st.dataframe(recommendations.tail(10), use_container_width=True)
+                        else:
                             st.info("Data rekomendasi analis tidak tersedia")
                         
                         st.markdown("### 🎯 Target Price")
@@ -737,8 +790,8 @@ if analyze_button or 'last_stock' in st.session_state:
                     """)
                 
     except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
-        st.info("💡 Pastikan kode saham benar (contoh: BBCA.JK)")
+        st.error(f"❌ Terjadi error: {str(e)}")
+        st.info("💡 Coba refresh halaman. Jika masalah berlanjut, kemungkinan API yfinance sedang diblokir.")
 
 else:
     # Welcome screen
