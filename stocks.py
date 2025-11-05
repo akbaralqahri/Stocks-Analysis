@@ -14,6 +14,22 @@ warnings.filterwarnings('ignore')
 # Kita cache data untuk 10 menit (600 detik) atau 1 jam (3600 detik)
 # Ini akan mengurangi panggilan API secara drastis
 
+# --- FUNGSI HELPER BARU UNTUK FORMAT ANGKA ---
+def format_value(x):
+    if isinstance(x, (int, float)) and not pd.isna(x):
+        if x == 0:
+            return "0"
+        if abs(x) >= 1_000_000_000_000:
+            return f'{x/1_000_000_000_000:.2f}T'
+        if abs(x) >= 1_000_000_000:
+            return f'{x/1_000_000_000:.2f}B'
+        if abs(x) >= 1_000_000:
+            return f'{x/1_000_000:.2f}M'
+        if abs(x) >= 1_000:
+            return f'{x/1_000:.2f}K'
+        return f'{x:,.0f}'
+    return x
+
 @st.cache_data(ttl=600) # Cache data histori selama 10 menit
 def get_stock_history(ticker, period):
     stock = yf.Ticker(ticker)
@@ -34,9 +50,16 @@ def get_financial_data(ticker):
     stock = yf.Ticker(ticker)
     try:
         financials = {
-            'income': stock.financials,
-            'balance': stock.balance_sheet,
-            'cashflow': stock.cashflow
+            'annual': {
+                'income': stock.financials,
+                'balance': stock.balance_sheet,
+                'cashflow': stock.cashflow
+            },
+            'quarterly': {
+                'income': stock.quarterly_financials,
+                'balance': stock.quarterly_balance_sheet,
+                'cashflow': stock.quarterly_cashflow
+            }
         }
         return financials
     except Exception as e:
@@ -336,40 +359,78 @@ def simple_prediction(df, info):
         'score_percentage': score_percentage
     }
 
-# Fungsi untuk menampilkan financial statements
+# Fungsi untuk memformat dan menampilkan financial statements
 def display_financials(financials_data):
     if financials_data is None:
         st.info("Data financial statements tidak tersedia untuk saham ini")
         return
         
+    # 1. BUAT PILIHAN ANNUAL ATAU QUARTAL
+    period_type = st.radio(
+        "Pilih Periode Laporan:",
+        ('Annual', 'Quarterly'),
+        horizontal=True
+    )
+    
+    st.markdown("---") # Pemisah
+        
     try:
+        if period_type == 'Annual':
+            data_source = financials_data['annual']
+        else:
+            data_source = financials_data['quarterly']
+
         tabs = st.tabs(["💰 Income Statement", "📊 Balance Sheet", "💵 Cash Flow"])
         
+        # Fungsi helper internal untuk memproses DataFrame
+        def format_and_display(df, period_type):
+            if df is None or df.empty:
+                return False
+            
+            # Buat salinan agar tidak mengubah data di cache
+            df_copy = df.copy()
+            
+            # 2. BUAT HEADER JADI TAHUN SAJA (JIKA ANNUAL) ATAU TAHUN-Q (JIKA QUARTAL)
+            new_cols = []
+            for col in df_copy.columns:
+                try:
+                    timestamp = pd.to_datetime(col)
+                    if period_type == 'Annual':
+                        new_cols.append(str(timestamp.year)) # Format: "2023"
+                    else: # Quarterly
+                        new_cols.append(f"{timestamp.year}-Q{timestamp.quarter}") # Format: "2023-Q4"
+                except:
+                    new_cols.append(col) # Biarkan kolom non-tanggal
+            
+            df_copy.columns = new_cols
+            
+            # 3. BUAT ANGKA JADI SIMPLE (T, B, M)
+            df_formatted = df_copy.applymap(format_value)
+            
+            st.dataframe(df_formatted, use_container_width=True)
+            return True
+
         with tabs[0]:
             st.subheader("Laporan Laba Rugi")
-            income_stmt = financials_data['income']
-            if not income_stmt.empty:
-                st.dataframe(income_stmt, use_container_width=True)
-            else:
-                st.info("Data laporan laba rugi tidak tersedia")
+            income_stmt = data_source.get('income')
+            if not format_and_display(income_stmt, period_type):
+                st.info(f"Data {period_type.lower()} laporan laba rugi tidak tersedia")
         
         with tabs[1]:
             st.subheader("Neraca")
-            balance_sheet = financials_data['balance']
-            if not balance_sheet.empty:
-                st.dataframe(balance_sheet, use_container_width=True)
-            else:
-                st.info("Data neraca tidak tersedia")
+            balance_sheet = data_source.get('balance')
+            if not format_and_display(balance_sheet, period_type):
+                st.info(f"Data {period_type.lower()} neraca tidak tersedia")
         
         with tabs[2]:
             st.subheader("Arus Kas")
-            cash_flow = financials_data['cashflow']
-            if not cash_flow.empty:
-                st.dataframe(cash_flow, use_container_width=True)
-            else:
-                st.info("Data arus kas tidak tersedia")
-    except:
-        st.info("Data financial statements tidak tersedia untuk saham ini")
+            cash_flow = data_source.get('cashflow')
+            if not format_and_display(cash_flow, period_type):
+                st.info(f"Data {period_type.lower()} arus kas tidak tersedia")
+                
+    except Exception as e:
+        st.error(f"Terjadi error saat memformat data keuangan: {e}")
+        st.info("Data financial statements mungkin tidak lengkap atau tidak tersedia untuk saham ini")
 
 # Main aplikasi
 if analyze_button or 'last_stock' in st.session_state:
@@ -496,7 +557,7 @@ if analyze_button or 'last_stock' in st.session_state:
                     # Bollinger Bands
                     st.subheader("📉 Bollinger Bands")
                     fig_bb = go.Figure()
-                    fig_bb.add_trace(go.Scatter(x=df.index, y=df['Close'], name='Close', line=dict(color='black')))
+                    fig_bb.add_trace(go.Scatter(x=df.index, y=df['Close'], name='Close', line=dict(color='white')))
                     fig_bb.add_trace(go.Scatter(x=df.index, y=df['BB_Upper'], name='Upper', line=dict(color='red', dash='dash')))
                     fig_bb.add_trace(go.Scatter(x=df.index, y=df['BB_Middle'], name='Middle', line=dict(color='blue')))
                     fig_bb.add_trace(go.Scatter(x=df.index, y=df['BB_Lower'], name='Lower', line=dict(color='green', dash='dash')))
