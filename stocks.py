@@ -302,6 +302,199 @@ def simple_prediction(df, info):
         'score_percentage': score_percentage
     }
 
+
+# --- (MULAI PENAMBAHAN) FUNGSI BARU UNTUK CHART KEUANGAN ---
+
+def create_income_chart(df, period_type):
+    """
+    Membuat chart combo untuk Laba Rugi (Income Statement).
+    """
+    try:
+        # Balik kolom agar kronologis (Tertua -> Terbaru)
+        df_chart = df.iloc[:, ::-1].copy()
+        
+        # Format kolom X-axis (Tahun atau Tahun-Kuartal)
+        new_cols = []
+        for col in df_chart.columns:
+            timestamp = pd.to_datetime(col)
+            if period_type == 'Annual':
+                new_cols.append(str(timestamp.year))
+            else:
+                new_cols.append(f"{timestamp.year}-Q{timestamp.quarter}")
+        df_chart.columns = new_cols
+        
+        # Ekstrak data, tangani kemungkinan key yang berbeda
+        revenue_key = 'Total Revenue' if 'Total Revenue' in df_chart.index else 'Revenue'
+        net_income_key = 'Net Income' if 'Net Income' in df_chart.index else 'Net Income To Common'
+        
+        # Pastikan key ada
+        if revenue_key not in df_chart.index or net_income_key not in df_chart.index:
+            st.info("Data Revenue atau Net Income tidak ditemukan untuk chart.")
+            return None # Tidak bisa membuat chart
+
+        revenue = df_chart.loc[revenue_key]
+        net_income = df_chart.loc[net_income_key]
+        
+        # Hitung Net Margin
+        net_margin = (net_income / revenue) * 100
+        
+        # Buat chart dengan 2 sumbu Y
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # Sumbu Y 1 (Kiri) - Bar charts
+        fig.add_trace(
+            go.Bar(x=df_chart.columns, y=revenue, name="Revenue", marker_color='blue'),
+            secondary_y=False,
+        )
+        fig.add_trace(
+            go.Bar(x=df_chart.columns, y=net_income, name="Net Income", marker_color='green'),
+            secondary_y=False,
+        )
+
+        # Sumbu Y 2 (Kanan) - Line chart
+        fig.add_trace(
+            go.Scatter(x=df_chart.columns, y=net_margin, name="Net Margin (%)", mode='lines+markers', line=dict(color='red')),
+            secondary_y=True,
+        )
+
+        # Konfigurasi layout
+        fig.update_layout(
+            title="Grafik Laba Rugi (Revenue, Net Income, Net Margin)",
+            xaxis_title="Periode",
+            barmode='group',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        fig.update_yaxes(title_text="Value (Rp)", secondary_y=False)
+        fig.update_yaxes(title_text="Net Margin (%)", secondary_y=True)
+        
+        return fig
+    except Exception as e:
+        st.warning(f"Gagal membuat chart Laba Rugi: {e}")
+        return None # Signal failure
+
+def create_balance_sheet_chart(df, period_type):
+    """
+    Membuat chart combo untuk Neraca (Balance Sheet).
+    """
+    try:
+        # Balik kolom agar kronologis
+        df_chart = df.iloc[:, ::-1].copy()
+        
+        # Format kolom X-axis
+        new_cols = []
+        for col in df_chart.columns:
+            timestamp = pd.to_datetime(col)
+            if period_type == 'Annual':
+                new_cols.append(str(timestamp.year))
+            else:
+                new_cols.append(f"{timestamp.year}-Q{timestamp.quarter}")
+        df_chart.columns = new_cols
+
+        # Ekstrak data
+        assets_key = 'Total Assets'
+        liabilities_key = 'Total Liabilities Net Minority Interest' if 'Total Liabilities Net Minority Interest' in df_chart.index else 'Total Liabilities'
+        equity_key = 'Total Stockholder Equity' if 'Total Stockholder Equity' in df_chart.index else 'Total Equity Gross Minority Interest'
+
+        if assets_key not in df_chart.index or liabilities_key not in df_chart.index or equity_key not in df_chart.index:
+            st.info("Data Assets, Liabilities, atau Equity tidak ditemukan untuk chart.")
+            return None # Tidak bisa membuat chart
+
+        assets = df_chart.loc[assets_key]
+        liabilities = df_chart.loc[liabilities_key]
+        equity = df_chart.loc[equity_key]
+
+        # Hitung Debt to Equity Ratio
+        der = (liabilities / equity) # Ini adalah rasio, bukan persentase
+        
+        # Buat chart dengan 2 sumbu Y
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # Sumbu Y 1 (Kiri) - Bar charts
+        fig.add_trace(
+            go.Bar(x=df_chart.columns, y=assets, name="Total Assets", marker_color='blue'),
+            secondary_y=False,
+        )
+        fig.add_trace(
+            go.Bar(x=df_chart.columns, y=liabilities, name="Total Liabilities", marker_color='orange'),
+            secondary_y=False,
+        )
+
+        # Sumbu Y 2 (Kanan) - Line chart
+        fig.add_trace(
+            go.Scatter(x=df_chart.columns, y=der, name="Debt/Equity Ratio", mode='lines+markers', line=dict(color='red')),
+            secondary_y=True,
+        )
+
+        # Konfigurasi layout
+        fig.update_layout(
+            title="Grafik Neraca (Assets, Liabilities, D/E Ratio)",
+            xaxis_title="Periode",
+            barmode='group',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        fig.update_yaxes(title_text="Value (Rp)", secondary_y=False)
+        fig.update_yaxes(title_text="D/E Ratio", secondary_y=True)
+        
+        return fig
+    except Exception as e:
+        st.warning(f"Gagal membuat chart Neraca: {e}")
+        return None
+
+def create_cash_flow_chart(df, period_type):
+    """
+    Membuat bar chart untuk Arus Kas (Cash Flow).
+    """
+    try:
+        # Balik kolom agar kronologis
+        df_chart = df.iloc[:, ::-1].copy()
+        
+        # Format kolom X-axis
+        new_cols = []
+        for col in df_chart.columns:
+            timestamp = pd.to_datetime(col)
+            if period_type == 'Annual':
+                new_cols.append(str(timestamp.year))
+            else:
+                new_cols.append(f"{timestamp.year}-Q{timestamp.quarter}")
+        df_chart.columns = new_cols
+
+        # Ekstrak data - key yfinance bisa bervariasi
+        op_cash_key = 'Total Cash From Operating Activities' if 'Total Cash From Operating Activities' in df_chart.index else 'Cash From Operations'
+        inv_cash_key = 'Total Cash From Investing Activities' if 'Total Cash From Investing Activities' in df_chart.index else 'Cash From Investing'
+        fin_cash_key = 'Total Cash From Financing Activities' if 'Total Cash From Financing Activities' in df_chart.index else 'Cash From Financing'
+        
+        if op_cash_key not in df_chart.index or inv_cash_key not in df_chart.index or fin_cash_key not in df_chart.index:
+            st.info("Data Operating, Investing, atau Financing Cash Flow tidak ditemukan untuk chart.")
+            return None # Tidak bisa membuat chart
+            
+        op_cash = df_chart.loc[op_cash_key]
+        inv_cash = df_chart.loc[inv_cash_key]
+        fin_cash = df_chart.loc[fin_cash_key]
+
+        # Buat bar chart biasa
+        fig = go.Figure()
+
+        fig.add_trace(go.Bar(x=df_chart.columns, y=op_cash, name="Operating Cash Flow"))
+        fig.add_trace(go.Bar(x=df_chart.columns, y=inv_cash, name="Investing Cash Flow"))
+        fig.add_trace(go.Bar(x=df_chart.columns, y=fin_cash, name="Financing Cash Flow"))
+
+        # Konfigurasi layout
+        fig.update_layout(
+            title="Grafik Arus Kas (Operating, Investing, Financing)",
+            xaxis_title="Periode",
+            barmode='group',
+            yaxis_title="Value (Rp)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        return fig
+    except Exception as e:
+        st.warning(f"Gagal membuat chart Arus Kas: {e}")
+        return None
+
+# --- (AKHIR PENAMBAHAN) FUNGSI BARU ---
+
+
 # Fungsi untuk memformat dan menampilkan financial statements
 def display_financials(financials_data):
     if financials_data is None:
@@ -356,18 +549,45 @@ def display_financials(financials_data):
         with tabs[0]:
             st.subheader("Laporan Laba Rugi")
             income_stmt = data_source.get('income')
+            
+            # --- (MULAI MODIFIKASI) TAMBAHKAN CHART ---
+            if income_stmt is not None and not income_stmt.empty:
+                fig_income = create_income_chart(income_stmt, period_type)
+                if fig_income:
+                    st.plotly_chart(fig_income, use_container_width=True)
+                st.markdown("---") # Pemisah antara chart dan tabel
+            # --- (AKHIR MODIFIKASI) ---
+            
             if not format_and_display(income_stmt, period_type):
                 st.info(f"Data {period_type.lower()} laporan laba rugi tidak tersedia")
         
         with tabs[1]:
             st.subheader("Neraca")
             balance_sheet = data_source.get('balance')
+            
+            # --- (MULAI MODIFIKASI) TAMBAHKAN CHART ---
+            if balance_sheet is not None and not balance_sheet.empty:
+                fig_balance = create_balance_sheet_chart(balance_sheet, period_type)
+                if fig_balance:
+                    st.plotly_chart(fig_balance, use_container_width=True)
+                st.markdown("---") # Pemisah
+            # --- (AKHIR MODIFIKASI) ---
+            
             if not format_and_display(balance_sheet, period_type):
                 st.info(f"Data {period_type.lower()} neraca tidak tersedia")
         
         with tabs[2]:
             st.subheader("Arus Kas")
             cash_flow = data_source.get('cashflow')
+            
+            # --- (MULAI MODIFIKASI) TAMBAHKAN CHART ---
+            if cash_flow is not None and not cash_flow.empty:
+                fig_cash = create_cash_flow_chart(cash_flow, period_type)
+                if fig_cash:
+                    st.plotly_chart(fig_cash, use_container_width=True)
+                st.markdown("---") # Pemisah
+            # --- (AKHIR MODIFIKASI) ---
+            
             if not format_and_display(cash_flow, period_type):
                 st.info(f"Data {period_type.lower()} arus kas tidak tersedia")
                 
@@ -667,6 +887,7 @@ def run_single_analysis_page(stock_code, period):
             # TAB 4: FINANCIALS
             with main_tabs[3]:
                 financials_data = get_financial_data(stock_code)
+                # Fungsi display_financials sekarang akan otomatis menampilkan chart
                 display_financials(financials_data)
             
             # TAB 5: KEY STATISTICS
