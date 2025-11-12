@@ -6,6 +6,8 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import numpy as np
 import warnings
+# Hapus import requests (sudah tidak diperlukan)
+
 warnings.filterwarnings('ignore')
 
 # --- FUNGSI HELPER BARU UNTUK FORMAT ANGKA ---
@@ -84,6 +86,47 @@ def get_recommendations_data(ticker):
         return yf.Ticker(ticker).recommendations
     except Exception as e:
         return None
+
+# --- (MODIFIKASI) FUNGSI UNTUK MENGAMBIL TICKER DARI FILE LOKAL ---
+@st.cache_data(ttl=86400) # Cache daftar ticker selama 1 hari (24 jam)
+def get_tickers_from_file(filename="ihsg_tickers.txt"):
+    """
+    Mengambil semua ticker saham dari file teks lokal.
+    """
+    st.write(f"Membaca daftar ticker dari {filename}...")
+    try:
+        # Coba buka file
+        with open(filename, 'r') as f:
+            content = f.read()
+        
+        # Proses content
+        tickers_raw = content.split() # Pisahkan berdasarkan spasi atau baris baru
+        
+        processed_tickers = [
+            f"{ticker.strip().upper()}.JK"
+            for ticker in tickers_raw
+            if len(ticker.strip()) == 4 and ticker.strip().upper().isalpha()
+        ]
+        
+        # Kembalikan daftar yang unik dan sudah disortir
+        final_list = sorted(list(set(processed_tickers)))
+        
+        if not final_list:
+            st.error(f"File {filename} ditemukan, tapi gagal memproses ticker.")
+            return []
+            
+        st.success(f"Berhasil mendapatkan {len(final_list)} ticker saham dari file.")
+        return final_list
+    
+    except FileNotFoundError:
+        st.error(f"File ticker '{filename}' tidak ditemukan.")
+        st.warning(f"Pastikan file '{filename}' ada di folder yang sama dengan stocks.py.")
+        return [] # Kembalikan daftar kosong jika gagal
+    except Exception as e:
+        st.error(f"Gagal membaca file ticker: {e}")
+        return [] # Kembalikan daftar kosong jika gagal
+# --- (AKHIR MODIFIKASI) ---
+
 
 # --- FUNGSI ANALISIS ---
 
@@ -1224,7 +1267,7 @@ def run_single_analysis_page(stock_code, period):
                 st.warning("""
                 ⚠️ **DISCLAIMER PENTING:**
                 Analisis ini ... (Disclaimer tidak berubah) ...
-                **Selalu lakukan riset mendalam dan konsultasi dengan advisor keuangan profesional sebelum mengambil keputusan investasi!**
+                 **Selalu lakukan riset mendalam dan konsultasi dengan advisor keuangan profesional sebelum mengambil keputusan investasi!**
                 """)
             # --- (AKHIR MODIFIKASI TAB PREDICTION) ---
             
@@ -1529,15 +1572,23 @@ def run_watchlist_page():
         )
 
 # --- (BARU) FUNGSI HALAMAN STOCK SCREENER (SARAN 4) ---
+# --- (MODIFIKASI) FUNGSI INI DIUBAH UNTUK MENGGUNAKAN SCRAPER ---
 def run_screener_page():
     st.subheader("🔍 Stock Screener")
-    st.info("Saring saham berdasarkan kriteria fundamental. Penyaringan dilakukan pada daftar saham populer.")
     
-    # Daftar saham untuk di-screen. Bisa diperluas nanti.
-    # Menggunakan default_stocks dari halaman komparasi
-    default_stocks = "AADI, ANTM, ARCI, ARKO, BBCA, BBNI, BBRI, BMRI, BREN, BRIS, BRPT, BUMI, CDIA, CUAN, EMAS, ENRG, ICBP, INKP, MDKA, PGEO, PTRO, RAJA, RATU, TLKM, TPIA, ULTJ, BRMS, TOBA, GOTO, GIAA, WIFI, BUVA, TOBA, ASII, UNVR"
-    stock_list_raw = default_stocks.replace(",", " ").replace("\n", " ").split()
-    stock_universe = sorted(list(set([t.strip().upper() + ".JK" for t in stock_list_raw if t.strip()])))
+    # --- PERUBAHAN DI SINI ---
+    # Ambil daftar saham dari file, bukan scraper
+    with st.spinner("Membaca daftar lengkap saham IHSG..."):
+        stock_universe = get_tickers_from_file("ihsg_tickers.txt") # Panggil fungsi baru
+
+    # Fallback (jaring pengaman) jika scraper gagal
+    if not stock_universe:
+        st.warning("Gagal mengambil daftar saham lengkap dari internet. Menggunakan daftar populer (default) sebagai fallback.")
+        default_stocks = "AADI, ANTM, ARCI, ARKO, BBCA, BBNI, BBRI, BMRI, BREN, BRIS, BRPT, BUMI, CDIA, CUAN, EMAS, ENRG, ICBP, INKP, MDKA, PGEO, PTRO, RAJA, RATU, TLKM, TPIA, ULTJ, BRMS, TOBA, GOTO, GIAA, WIFI, BUVA, TOBA, ASII, UNVR"
+        stock_list_raw = default_stocks.replace(",", " ").replace("\n", " ").split()
+        stock_universe = sorted(list(set([t.strip().upper() + ".JK" for t in stock_list_raw if t.strip()])))
+    # --- AKHIR PERUBAHAN ---
+
     
     # Daftar sektor (manual, bisa disesuaikan)
     sektor_list = [
@@ -1558,18 +1609,29 @@ def run_screener_page():
         
         screener_button = st.button("🔍 Cari Saham", type="primary", use_container_width=True)
 
-    st.write(f"Menyaring dari **{len(stock_universe)}** saham populer...")
+    # Tampilkan info jumlah saham yang akan di-screen
+    st.info(f"Saring saham berdasarkan kriteria fundamental. Penyaringan akan dilakukan pada **{len(stock_universe)}** saham yang terdeteksi.")
 
     if screener_button:
+        
+        # Peringatan performa
+        if len(stock_universe) > 100:
+            st.warning(f"PERINGATAN: Anda akan menyaring {len(stock_universe)} saham. Proses ini akan **SANGAT LAMBAT** (bisa 5-15 menit) karena `yfinance` mengambil data satu per satu. Harap bersabar.")
+            
         results = []
         invalid_tickers = []
         
-        progress_bar = st.progress(0, text="Memulai penyaringan...")
+        progress_bar = st.progress(0, text="Memulai penyaringan... (Ini akan lama)")
         
         for i, ticker in enumerate(stock_universe):
-            progress_bar.progress((i + 1) / len(stock_universe), text=f"Menganalisis {ticker} ({i+1}/{len(stock_universe)})...")
+            # Update progress bar
+            progress_text = f"Menganalisis {ticker} ({i+1}/{len(stock_universe)})... (Ini akan lama)"
+            progress_bar.progress((i + 1) / len(stock_universe), text=progress_text)
+            
             try:
+                # Ambil info fundamental. get_stock_info sudah di-cache.
                 info = get_stock_info(ticker)
+                
                 if info is None:
                     invalid_tickers.append(ticker)
                     continue
@@ -1581,11 +1643,12 @@ def run_screener_page():
                 de = info.get('debtToEquity')
                 sector = info.get('sector', 'N/A')
                 
-                # Lewati jika data tidak lengkap
-                if pe is None or pb is None or de is None:
+                # Lewati jika data kunci tidak ada (penting untuk filter)
+                if pe is None or pb is None or de is None or roe is None:
                     continue
                     
                 # Terapkan Filter
+                # Pastikan P/E dan P/B positif untuk perbandingan
                 if (pe > 0 and pe <= pe_max and 
                     pb > 0 and pb <= pb_max and 
                     roe >= roe_min and 
@@ -1607,9 +1670,10 @@ def run_screener_page():
                 invalid_tickers.append(f"{ticker} (Error)")
         
         progress_bar.empty()
+        st.success("Penyaringan selesai!")
         
         if invalid_tickers:
-            st.warning(f"Gagal menganalisis {len(invalid_tickers)} saham.")
+            st.warning(f"Gagal menganalisis data untuk {len(invalid_tickers)} saham (mungkin data tidak lengkap).")
 
         if not results:
             st.error("Tidak ada saham yang lolos kriteria filter Anda.")
