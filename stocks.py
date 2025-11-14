@@ -1719,8 +1719,8 @@ if 'watchlist' not in st.session_state:
     st.session_state.watchlist = []
 # --- (AKHIR INISIALISASI) ---
 
-st.title("📈 Analisis Saham IHSG - Professional Edition")
-st.markdown("Platform analisis saham Indonesia lengkap dengan prediksi pergerakan")
+st.title("📈 Analisis Saham IHSG")
+st.markdown("by @akbaralqahri")
 
 # --- (BARU) MODIFIKASI: PENGALIH HALAMAN (SARAN 4 & 5) ---
 page_selection = st.radio(
