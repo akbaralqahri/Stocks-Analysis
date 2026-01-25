@@ -6,13 +6,12 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import numpy as np
 import warnings
-# Hapus import requests (sudah tidak diperlukan)
+import os
 
 warnings.filterwarnings('ignore')
 
 # --- FUNGSI HELPER BARU UNTUK FORMAT ANGKA ---
 def format_value(x):
-# ... (Kode helper ini tidak berubah) ...
     if isinstance(x, (int, float)) and not pd.isna(x):
         if x == 0:
             return "0"
@@ -30,7 +29,6 @@ def format_value(x):
 # --- FUNGSI CACHE UNTUK YFINANCE ---
 @st.cache_data(ttl=600) # Cache data histori selama 10 menit
 def get_stock_history(ticker, period, interval="1d"):
-# ... (Kode cache ini tidak berubah) ...
     stock = yf.Ticker(ticker)
     df = stock.history(period=period, interval=interval)
     if df.empty:
@@ -39,7 +37,6 @@ def get_stock_history(ticker, period, interval="1d"):
 
 @st.cache_data(ttl=3600) # Cache info perusahaan selama 1 jam
 def get_stock_info(ticker):
-# ... (Kode cache ini tidak berubah) ...
     try:
         return yf.Ticker(ticker).info
     except Exception as e:
@@ -47,7 +44,6 @@ def get_stock_info(ticker):
 
 @st.cache_data(ttl=3600) # Cache data keuangan selama 1 jam
 def get_financial_data(ticker):
-# ... (Kode cache ini tidak berubah) ...
     stock = yf.Ticker(ticker)
     try:
         financials = {
@@ -68,7 +64,6 @@ def get_financial_data(ticker):
 
 @st.cache_data(ttl=3600) # Cache data holders selama 1 jam
 def get_holders_data(ticker):
-# ... (Kode cache ini tidak berubah) ...
     stock = yf.Ticker(ticker)
     try:
         holders = {
@@ -81,20 +76,23 @@ def get_holders_data(ticker):
 
 @st.cache_data(ttl=3600) # Cache data rekomendasi selama 1 jam
 def get_recommendations_data(ticker):
-# ... (Kode cache ini tidak berubah) ...
     try:
         return yf.Ticker(ticker).recommendations
     except Exception as e:
         return None
 
-# --- (MODIFIKASI) FUNGSI UNTUK MENGAMBIL TICKER DARI FILE LOKAL ---
+# --- FUNGSI UNTUK MENGAMBIL TICKER DARI FILE LOKAL ---
 @st.cache_data(ttl=86400) # Cache daftar ticker selama 1 hari (24 jam)
 def get_tickers_from_file(filename="ihsg_tickers.txt"):
     """
     Mengambil semua ticker saham dari file teks lokal.
     """
-    st.write(f"Membaca daftar ticker dari {filename}...")
+    # st.write(f"Membaca daftar ticker dari {filename}...") # Debugging line
     try:
+        # Cek apakah file ada
+        if not os.path.exists(filename):
+             return []
+
         # Coba buka file
         with open(filename, 'r') as f:
             content = f.read()
@@ -103,36 +101,27 @@ def get_tickers_from_file(filename="ihsg_tickers.txt"):
         tickers_raw = content.split() # Pisahkan berdasarkan spasi atau baris baru
         
         processed_tickers = [
-            f"{ticker.strip().upper()}.JK"
+            f"{ticker.strip().upper()}"
             for ticker in tickers_raw
-            if len(ticker.strip()) == 4 and ticker.strip().upper().isalpha()
+            if len(ticker.strip()) >= 4 and ticker.strip().upper().isalpha()
         ]
         
         # Kembalikan daftar yang unik dan sudah disortir
         final_list = sorted(list(set(processed_tickers)))
         
         if not final_list:
-            st.error(f"File {filename} ditemukan, tapi gagal memproses ticker.")
             return []
             
-        st.success(f"Berhasil mendapatkan {len(final_list)} ticker saham dari file.")
         return final_list
     
-    except FileNotFoundError:
-        st.error(f"File ticker '{filename}' tidak ditemukan.")
-        st.warning(f"Pastikan file '{filename}' ada di folder yang sama dengan stocks.py.")
-        return [] # Kembalikan daftar kosong jika gagal
     except Exception as e:
         st.error(f"Gagal membaca file ticker: {e}")
-        return [] # Kembalikan daftar kosong jika gagal
-# --- (AKHIR MODIFIKASI) ---
-
+        return []
 
 # --- FUNGSI ANALISIS ---
 
 # Fungsi untuk menghitung indikator teknikal lengkap
 def calculate_all_indicators(df):
-# ... (Kode fungsi ini tidak berubah) ...
     # Moving Averages
     df['MA5'] = df['Close'].rolling(window=5).mean()
     df['MA10'] = df['Close'].rolling(window=10).mean()
@@ -194,13 +183,6 @@ def calculate_all_indicators(df):
     # OBV (On-Balance Volume)
     df['OBV'] = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
     
-    # Williams %R
-    df['Williams_%R'] = ((high_14 - df['Close']) / (high_14 - low_14)) * -100
-    
-    # CCI (Commodity Channel Index)
-    tp = (df['High'] + df['Low'] + df['Close']) / 3
-    df['CCI'] = (tp - tp.rolling(20).mean()) / (0.015 * tp.rolling(20).std())
-    
     # MFI (Money Flow Index)
     typical_price = (df['High'] + df['Low'] + df['Close']) / 3
     money_flow = typical_price * df['Volume']
@@ -213,7 +195,6 @@ def calculate_all_indicators(df):
 
 # Fungsi prediksi sederhana (Teknikal)
 def simple_prediction(df, info):
-# ... (Kode fungsi ini tidak berubah) ...
     signals = []
     scores = 0
     max_score = 0
@@ -350,9 +331,8 @@ def simple_prediction(df, info):
         'score_percentage': score_percentage
     }
 
-# --- (BARU) FUNGSI SKOR FUNDAMENTAL (SARAN 1) ---
+# --- FUNGSI SKOR FUNDAMENTAL ---
 def calculate_fundamental_score(info):
-# ... (Kode fungsi ini tidak berubah) ...
     """
     Menganalisis data fundamental 'info' dan memberikan skor.
     """
@@ -480,12 +460,9 @@ def calculate_fundamental_score(info):
         'max_score': max_score,
         'score_percentage': score_percentage
     }
-# --- (AKHIR FUNGSI BARU) ---
-
 
 # --- FUNGSI CHART KEUANGAN ---
 def create_income_chart(df, period_type):
-# ... (Kode fungsi ini tidak berubah) ...
     try:
         # Balik kolom agar kronologis (Tertua -> Terbaru)
         df_chart = df.iloc[:, ::-1].copy()
@@ -547,10 +524,9 @@ def create_income_chart(df, period_type):
         return fig
     except Exception as e:
         st.warning(f"Gagal membuat chart Laba Rugi: {e}")
-        return None # Signal failure
+        return None
 
 def create_balance_sheet_chart(df, period_type):
-# ... (Kode fungsi ini tidak berubah) ...
     try:
         # Balik kolom agar kronologis
         df_chart = df.iloc[:, ::-1].copy()
@@ -616,7 +592,6 @@ def create_balance_sheet_chart(df, period_type):
         return None
 
 def create_cash_flow_chart(df, period_type):
-# ... (Kode fungsi ini tidak berubah) ...
     try:
         # Balik kolom agar kronologis
         df_chart = df.iloc[:, ::-1].copy()
@@ -665,10 +640,8 @@ def create_cash_flow_chart(df, period_type):
         st.warning(f"Gagal membuat chart Arus Kas: {e}")
         return None
 
-
 # Fungsi untuk memformat dan menampilkan financial statements
 def display_financials(financials_data):
-# ... (Kode fungsi ini tidak berubah) ...
     if financials_data is None:
         st.info("Data financial statements tidak tersedia untuk saham ini")
         return
@@ -763,7 +736,6 @@ def display_financials(financials_data):
 
 # --- FUNGSI HALAMAN: ANALISIS TUNGGAL ---
 def run_single_analysis_page(stock_code, period):
-# ... (Kode fungsi ini sebagian besar tidak berubah, dengan 3 modifikasi) ...
     try:
         interval_to_fetch = "1d" 
         if period == "1d":
@@ -810,7 +782,6 @@ def run_single_analysis_page(stock_code, period):
             # Header Info
             st.markdown(f"## 🏢 {info.get('longName', stock_code)}")
             
-            # --- (BARU) MODIFIKASI: TAMBAHKAN TOMBOL WATCHLIST (SARAN 5) ---
             if st.button("❤️ Tambahkan ke Watchlist", key=f"add_{stock_code}"):
                 if stock_code not in st.session_state.watchlist:
                     st.session_state.watchlist.append(stock_code)
@@ -818,7 +789,6 @@ def run_single_analysis_page(stock_code, period):
                     st.rerun() # Refresh untuk update state (opsional tapi bagus)
                 else:
                     st.info(f"{stock_code} sudah ada di Watchlist.")
-            # --- (AKHIR MODIFIKASI) ---
 
             col1, col2, col3, col4, col5 = st.columns(5)
             # ... (Kode metric harga tidak berubah) ...
@@ -849,7 +819,6 @@ def run_single_analysis_page(stock_code, period):
                 if 'marketCap' in info and info['marketCap']:
                     st.metric("Market Cap", format_value(info['marketCap']))
             
-            # --- (BARU) MODIFIKASI: NAMA TAB BERUBAH (SARAN 3 & 1) ---
             main_tabs = st.tabs([
                 "📊 Overview",
                 "📈 Technical Analysis", 
@@ -857,14 +826,12 @@ def run_single_analysis_page(stock_code, period):
                 "📋 Financials",
                 "🔑 Key Stats",
                 "👥 Holders",
-                "📰 Berita Terbaru",      # Tab Baru (Saran 3)
-                "🎯 Analisis & Prediksi"  # Tab Prediction diubah (Saran 1)
+                "📰 Berita Terbaru",      
+                "🎯 Analisis & Prediksi"  
             ])
-            # --- (AKHIR MODIFIKASI) ---
             
             # TAB 1: OVERVIEW
             with main_tabs[0]:
-            # ... (Kode tab ini tidak berubah) ...
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
@@ -901,7 +868,6 @@ def run_single_analysis_page(stock_code, period):
             
             # TAB 2: TECHNICAL ANALYSIS
             with main_tabs[1]:
-            # ... (Kode tab ini tidak berubah) ...
                 st.subheader("📊 Analisis Teknikal Lengkap")
                 
                 # Indikator Grid
@@ -968,7 +934,7 @@ def run_single_analysis_page(stock_code, period):
                 # Volume & OBV
                 st.subheader("📊 Volume & OBV Analysis")
                 fig_vol = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-                                       subplot_titles=('Volume', 'OBV'))
+                                     subplot_titles=('Volume', 'OBV'))
                 
                 colors = ['red' if df['Close'].iloc[i] < df['Open'].iloc[i] else 'green' for i in range(len(df))]
                 fig_vol.add_trace(go.Bar(x=df.index, y=df['Volume'], name='Volume', marker_color=colors), row=1, col=1)
@@ -978,7 +944,6 @@ def run_single_analysis_page(stock_code, period):
             
             # TAB 3: FUNDAMENTAL
             with main_tabs[2]:
-            # ... (Kode tab ini tidak berubah) ...
                 st.subheader("💼 Analisis Fundamental")
                 
                 col1, col2, col3 = st.columns(3)
@@ -1044,13 +1009,11 @@ def run_single_analysis_page(stock_code, period):
             
             # TAB 4: FINANCIALS
             with main_tabs[3]:
-            # ... (Kode tab ini tidak berubah) ...
                 financials_data = get_financial_data(stock_code)
                 display_financials(financials_data)
             
             # TAB 5: KEY STATISTICS
             with main_tabs[4]:
-            # ... (Kode tab ini tidak berubah) ...
                 st.subheader("🔑 Key Statistics")
                 
                 col1, col2 = st.columns(2)
@@ -1084,7 +1047,6 @@ def run_single_analysis_page(stock_code, period):
             
             # TAB 6: HOLDERS
             with main_tabs[5]:
-            # ... (Kode tab ini tidak berubah) ...
                 st.subheader("👥 Holders & Recommendations")
                 
                 col1, col2 = st.columns(2)
@@ -1121,7 +1083,7 @@ def run_single_analysis_page(stock_code, period):
                     if 'recommendationKey' in info:
                         st.metric("Recommendation", info['recommendationKey'].upper())
             
-            # --- (BARU) TAB 7: BERITA TERBARU (SARAN 3) ---
+            # TAB 7: BERITA TERBARU
             with main_tabs[6]:
                 st.subheader("📰 Berita Terbaru")
                 try:
@@ -1134,7 +1096,6 @@ def run_single_analysis_page(stock_code, period):
                     else:
                         for item in news[:10]: # Tampilkan 10 berita teratas
                             
-                            # --- PERBAIKAN DI SINI ---
                             title = item.get('title')
                             link = item.get('link')
                             publisher = item.get('publisher', 'N/A')
@@ -1149,9 +1110,6 @@ def run_single_analysis_page(stock_code, period):
                                 # Jika tidak ada title, lewati item ini
                                 continue
                             
-                            # Konversi timestamp ke datetime (kode ini sudah aman)
-                            # --- AKHIR PERBAIKAN ---
-
                             try:
                                 date = pd.to_datetime(item.get('providerPublishTime'), unit='s').tz_localize('UTC').tz_convert('Asia/Jakarta').strftime('%d-%m-%Y %H:%M')
                             except:
@@ -1160,9 +1118,8 @@ def run_single_analysis_page(stock_code, period):
                             st.markdown("---")
                 except Exception as e:
                     st.error(f"Gagal mengambil berita: {e}")
-            # --- (AKHIR TAB BARU) ---
-
-            # --- (BARU) MODIFIKASI: TAB PREDICTION DIPERBARUI (SARAN 1) ---
+            
+            # TAB 8: ANALISIS & PREDIKSI
             with main_tabs[7]: # Dulu tab 6, sekarang jadi 7
                 st.subheader("🎯 Analisis & Prediksi")
                 
@@ -1239,7 +1196,6 @@ def run_single_analysis_page(stock_code, period):
                 
                 # Risk Assessment & Disclaimer
                 st.markdown("### ⚠️ Risk Assessment")
-                # ... (Kode risk assessment tidak berubah) ...
                 if 'beta' in info and info['beta']:
                     beta = info['beta']
                     if beta > 1.5:
@@ -1266,31 +1222,50 @@ def run_single_analysis_page(stock_code, period):
                 
                 st.warning("""
                 ⚠️ **DISCLAIMER PENTING:**
-                Analisis ini ... (Disclaimer tidak berubah) ...
+                Analisis ini hanya alat bantu dan TIDAK menjamin keuntungan. 
+                Data historis tidak menjamin kinerja masa depan. 
                  **Selalu lakukan riset mendalam dan konsultasi dengan advisor keuangan profesional sebelum mengambil keputusan investasi!**
                 """)
-            # --- (AKHIR MODIFIKASI TAB PREDICTION) ---
             
     except Exception as e:
         st.error(f"❌ Terjadi error: {str(e)}")
         st.info("💡 Coba refresh halaman. Jika masalah berlanjut, kemungkinan API yfinance sedang diblokir.")
 
-# --- (BARU) MODIFIKASI: FUNGSI HALAMAN KOMPARASI (SARAN 2) ---
+# --- (MODIFIKASI) FUNGSI HALAMAN KOMPARASI ---
 def run_comparison_page():
     """
     Menjalankan logika untuk halaman komparasi multi-saham dengan data fundamental.
     """
     st.subheader("Bandingkan Performa Saham")
     
-    st.info("Masukkan beberapa kode saham, dipisahkan koma atau baris baru (cth: BBCA, BBRI, TLKM). .JK akan ditambahkan otomatis.")
-    
-    default_stocks = "AADI, ANTM, ARCI, ARKO, BBCA, BBNI, BBRI, BMRI, BREN, BRIS, BRPT, BUMI, CDIA, CUAN, EMAS, ENRG, ICBP, INKP, MDKA, PGEO, PTRO, RAJA, RATU, TLKM, TPIA, ULTJ, BRMS, TOBA, GOTO, GIAA, WIFI, BUVA, TOBA"
-    stock_list_input = st.text_area(
-        "Daftar Saham",
-        default_stocks,
-        height=150
+    # --- PILIHAN INPUT: MANUAL ATAU FILE ---
+    input_method = st.radio(
+        "Pilih Sumber Daftar Saham:",
+        ("Input Manual", "Ambil Semua dari File (ihsg_tickers.txt)"),
+        horizontal=True
     )
     
+    stock_list_input = ""
+    tickers_from_file = []
+    
+    if input_method == "Input Manual":
+        st.info("Masukkan beberapa kode saham, dipisahkan koma atau baris baru (cth: BBCA, BBRI, TLKM). .JK akan ditambahkan otomatis.")
+        default_stocks = "AADI, ANTM, ARCI, ARKO, BBCA, BBNI, BBRI, BMRI, BREN, BRIS, BRPT, BUMI, CDIA, CUAN, EMAS, ENRG, ICBP, INKP, MDKA, PGEO, PTRO, RAJA, RATU, TLKM, TPIA, ULTJ, BRMS, TOBA, GOTO, GIAA, WIFI, BUVA, TOBA"
+        stock_list_input = st.text_area(
+            "Daftar Saham",
+            default_stocks,
+            height=150
+        )
+    else:
+        # Load dari file
+        tickers_from_file = get_tickers_from_file("ihsg_tickers.txt")
+        if tickers_from_file:
+            st.info(f"Berhasil memuat **{len(tickers_from_file)}** saham dari file `ihsg_tickers.txt`.")
+            with st.expander("Lihat daftar saham"):
+                st.write(", ".join(tickers_from_file))
+        else:
+            st.warning("File `ihsg_tickers.txt` tidak ditemukan atau kosong.")
+
     period_options = {
         "1 Hari": "1d",
         "1 Pekan": "5d",
@@ -1318,19 +1293,36 @@ def run_comparison_page():
         compare_button = st.button("🚀 Bandingkan Saham", type="primary", use_container_width=True)
     
     if compare_button:
-        tickers_raw = stock_list_input.replace(",", " ").replace("\n", " ").split()
-        processed_tickers = []
-        for t in tickers_raw:
-            t_clean = t.strip().upper()
-            if t_clean: 
-                if not t_clean.endswith('.JK'):
-                    t_clean += '.JK'
-                processed_tickers.append(t_clean)
-        tickers = sorted(list(set(processed_tickers))) 
-        
+        # --- PROSES PEMBUATAN LIST TICKER ---
+        if input_method == "Input Manual":
+            tickers_raw = stock_list_input.replace(",", " ").replace("\n", " ").split()
+            processed_tickers = []
+            for t in tickers_raw:
+                t_clean = t.strip().upper()
+                if t_clean: 
+                    if not t_clean.endswith('.JK'):
+                        t_clean += '.JK'
+                    processed_tickers.append(t_clean)
+            tickers = sorted(list(set(processed_tickers))) 
+        else:
+            # Jika dari file, asumsikan get_tickers_from_file mengembalikan raw ticker (misal "BBCA")
+            # Kita perlu tambahkan .JK
+            processed_tickers = []
+            for t in tickers_from_file:
+                t_clean = t.strip().upper()
+                if t_clean:
+                    if not t_clean.endswith('.JK'):
+                        t_clean += '.JK'
+                    processed_tickers.append(t_clean)
+            tickers = processed_tickers
+
         if not tickers:
             st.warning("Harap masukkan setidaknya satu kode saham yang valid.")
             return
+
+        # Peringatan jika jumlah saham banyak
+        if len(tickers) > 50:
+            st.warning(f"Anda membandingkan {len(tickers)} saham. Proses ini mungkin memakan waktu lama karena batasan API.")
 
         results = []
         invalid_tickers = []
@@ -1398,7 +1390,8 @@ def run_comparison_page():
         progress_bar.empty() 
         
         if invalid_tickers:
-            st.warning(f"Gagal mengambil data untuk saham berikut: {', '.join(invalid_tickers)}")
+            with st.expander(f"Gagal mengambil data untuk {len(invalid_tickers)} saham"):
+                st.write(", ".join(invalid_tickers))
 
         if not results:
             st.error("Tidak ada data saham yang berhasil dianalisis.")
@@ -1420,7 +1413,6 @@ def run_comparison_page():
                 "Skor Fundamental": st.column_config.ProgressColumn(
                     "Skor Fundamental", min_value=-5, max_value=9
                 ),
-                # --- (PERBAIKAN) Mengganti BarColumn -> ProgressColumn ---
                 "P/E": st.column_config.ProgressColumn(
                     "P/E Ratio", min_value=0, max_value=max(50, df_results["P/E"].max())
                 ),
@@ -1436,12 +1428,11 @@ def run_comparison_page():
                 "Margin (%)": st.column_config.ProgressColumn(
                     "Margin (%)", min_value=min(0, df_results["Margin (%)"].min()), max_value=max(30, df_results["Margin (%)"].max())
                 ),
-                # --- (AKHIR PERBAIKAN) ---
             },
             height=600 # Beri tinggi agar muat banyak
         )
 
-# --- (BARU) FUNGSI HALAMAN WATCHLIST (SARAN 5) ---
+# --- FUNGSI HALAMAN WATCHLIST ---
 def run_watchlist_page():
     st.subheader("⭐ Watchlist Saya")
     
@@ -1459,7 +1450,7 @@ def run_watchlist_page():
     # Tampilkan daftar saham di watchlist
     st.write("Daftar Saham:", ", ".join(watchlist))
     
-    # --- (BARU) Tambahkan Pilihan Periode ---
+    # --- Pilihan Periode ---
     period_options = {
         "1 Hari": "1d", "1 Pekan": "5d", "1 Bulan": "1mo",
         "3 Bulan": "3mo", "6 Bulan": "6mo", "1 Tahun": "1y",
@@ -1475,16 +1466,11 @@ def run_watchlist_page():
     )
     period = period_options[selected_period]
     st.markdown("---")
-    # --- (AKHIR PERUBAHAN) ---
 
     results = []
     invalid_tickers = []
     
     progress_bar = st.progress(0, text="Memuat data watchlist...")
-    
-    # --- (PERUBAHAN) Ganti hard-coded dengan kalkulasi ---
-    # Hapus: period = "1y"
-    # Hapus: interval_to_fetch = "1d"
     
     # Tambahkan kalkulasi interval
     interval_to_fetch = "1d" 
@@ -1492,7 +1478,6 @@ def run_watchlist_page():
         interval_to_fetch = "1m"
     elif period == "5d":
         interval_to_fetch = "60m"
-    # --- (AKHIR PERUBAHAN) ---
     
     for i, ticker in enumerate(watchlist):
         progress_bar.progress((i + 1) / len(watchlist), text=f"Menganalisis {ticker} ({i+1}/{len(watchlist)})...")
@@ -1504,7 +1489,6 @@ def run_watchlist_page():
                 invalid_tickers.append(ticker)
                 continue
             
-            # --- (BARU) Tambahkan filter waktu untuk 1d/5d ---
             try:
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
@@ -1524,7 +1508,6 @@ def run_watchlist_page():
             if df.empty:
                 invalid_tickers.append(f"{ticker} (No Data)")
                 continue
-            # --- (AKHIR BARU) ---
                 
             df_with_indicators = calculate_all_indicators(df)
             
@@ -1558,7 +1541,6 @@ def run_watchlist_page():
             df_results.sort_values(by="Skor Fundamental", ascending=False),
             use_container_width=True,
             column_config={
-                # --- (PERBAIKAN) Mengganti BarColumn -> ProgressColumn ---
                 "Saham": st.column_config.TextColumn(width="small"),
                 "Skor Teknikal": st.column_config.ProgressColumn("Skor Teknikal", min_value=-10, max_value=15),
                 "Skor Fundamental": st.column_config.ProgressColumn("Skor Fundamental", min_value=-5, max_value=9),
@@ -1567,29 +1549,31 @@ def run_watchlist_page():
                 "ROE (%)": st.column_config.ProgressColumn("ROE (%)", min_value=min(0, df_results["ROE (%)"].min()), max_value=max(30, df_results["ROE (%)"].max())),
                 "D/E (%)": st.column_config.ProgressColumn("D/E (%)", min_value=0, max_value=max(200, df_results["D/E (%)"].max())),
                 "Margin (%)": st.column_config.ProgressColumn("Margin (%)", min_value=min(0, df_results["Margin (%)"].min()), max_value=max(30, df_results["Margin (%)"].max())),
-                # --- (AKHIR PERBAIKAN) ---
             }
         )
 
-# --- (BARU) FUNGSI HALAMAN STOCK SCREENER (SARAN 4) ---
-# --- (MODIFIKASI) FUNGSI INI DIUBAH UNTUK MENGGUNAKAN SCRAPER ---
+# --- FUNGSI HALAMAN STOCK SCREENER ---
 def run_screener_page():
     st.subheader("🔍 Stock Screener")
     
-    # --- PERUBAHAN DI SINI ---
     # Ambil daftar saham dari file, bukan scraper
     with st.spinner("Membaca daftar lengkap saham IHSG..."):
-        stock_universe = get_tickers_from_file("ihsg_tickers.txt") # Panggil fungsi baru
+        stock_universe_raw = get_tickers_from_file("ihsg_tickers.txt")
+        # Tambahkan .JK jika belum ada untuk yfinance
+        stock_universe = []
+        for t in stock_universe_raw:
+             if not t.endswith('.JK'):
+                 stock_universe.append(f"{t}.JK")
+             else:
+                 stock_universe.append(t)
 
     # Fallback (jaring pengaman) jika scraper gagal
     if not stock_universe:
-        st.warning("Gagal mengambil daftar saham lengkap dari internet. Menggunakan daftar populer (default) sebagai fallback.")
+        st.warning("Gagal mengambil daftar saham lengkap dari file. Menggunakan daftar populer (default) sebagai fallback.")
         default_stocks = "AADI, ANTM, ARCI, ARKO, BBCA, BBNI, BBRI, BMRI, BREN, BRIS, BRPT, BUMI, CDIA, CUAN, EMAS, ENRG, ICBP, INKP, MDKA, PGEO, PTRO, RAJA, RATU, TLKM, TPIA, ULTJ, BRMS, TOBA, GOTO, GIAA, WIFI, BUVA, TOBA, ASII, UNVR"
         stock_list_raw = default_stocks.replace(",", " ").replace("\n", " ").split()
         stock_universe = sorted(list(set([t.strip().upper() + ".JK" for t in stock_list_raw if t.strip()])))
-    # --- AKHIR PERUBAHAN ---
 
-    
     # Daftar sektor (manual, bisa disesuaikan)
     sektor_list = [
         'Financials', 'Technology', 'Energy', 'Basic Materials', 'Industrials', 
@@ -1688,14 +1672,12 @@ def run_screener_page():
             df_results.sort_values(by="ROE (%)", ascending=False),
             use_container_width=True,
             column_config={
-                # --- (PERBAIKAN) Mengganti BarColumn -> ProgressColumn ---
                 "Saham": st.column_config.TextColumn(width="small"),
                 "P/E": st.column_config.ProgressColumn("P/E Ratio", min_value=0, max_value=pe_max),
                 "P/B": st.column_config.ProgressColumn("P/B Ratio", min_value=0, max_value=pb_max),
                 "ROE (%)": st.column_config.ProgressColumn("ROE (%)", min_value=roe_min, max_value=max(roe_min + 5, df_results["ROE (%)"].max())),
                 "D/E (%)": st.column_config.ProgressColumn("D/E (%)", min_value=0, max_value=de_max),
                 "Margin (%)": st.column_config.ProgressColumn("Margin (%)", min_value=min(0, df_results["Margin (%)"].min()), max_value=max(20, df_results["Margin (%)"].max())),
-                # --- (AKHIR PERBAIKAN) ---
             },
             height=600
         )
@@ -1714,15 +1696,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- (BARU) Inisialisasi Watchlist di Session State (SARAN 5) ---
+# --- Inisialisasi Watchlist di Session State ---
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = []
-# --- (AKHIR INISIALISASI) ---
+# --- AKHIR INISIALISASI ---
 
 st.title("📈 Analisis Saham IHSG")
 st.markdown("by @akbaralqahri")
 
-# --- (BARU) MODIFIKASI: PENGALIH HALAMAN (SARAN 4 & 5) ---
+# --- MODIFIKASI: PENGALIH HALAMAN ---
 page_selection = st.radio(
     "Pilih Mode Analisis:",
     ('Analisis Saham Tunggal', 'Komparasi Multi-Saham', '⭐ Watchlist Saya', '🔍 Stock Screener'),
@@ -1805,7 +1787,7 @@ if page_selection == 'Analisis Saham Tunggal':
             })
             st.dataframe(examples, use_container_width=True, hide_index=True)
 
-# --- (BARU) HALAMAN KOMPARASI ---
+# --- HALAMAN KOMPARASI ---
 elif page_selection == 'Komparasi Multi-Saham':
     # Kosongkan sidebar untuk mode ini
     with st.sidebar:
@@ -1816,7 +1798,7 @@ elif page_selection == 'Komparasi Multi-Saham':
         
     run_comparison_page()
 
-# --- (BARU) HALAMAN WATCHLIST (SARAN 5) ---
+# --- HALAMAN WATCHLIST ---
 elif page_selection == '⭐ Watchlist Saya':
     with st.sidebar:
         st.info("Tampilkan saham-saham yang telah Anda simpan di Watchlist.")
@@ -1826,7 +1808,7 @@ elif page_selection == '⭐ Watchlist Saya':
     
     run_watchlist_page()
 
-# --- (BARU) HALAMAN SCREENER (SARAN 4) ---
+# --- HALAMAN SCREENER ---
 elif page_selection == '🔍 Stock Screener':
     # Sidebar akan diisi oleh fungsi run_screener_page()
     if 'last_stock' in st.session_state:
